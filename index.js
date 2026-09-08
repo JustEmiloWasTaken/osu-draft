@@ -64,6 +64,16 @@ const DRAFT_CHARACTERS = [
 "itsNotFlames"
 ];
 
+const MAP_POOL = [
+    "🔵 Stage 1: katter - DOPA BRAT",
+    "🟠 Stage 2: Juka_Box feat. Souka - Macchi to Donchou",
+    "🔴 Stage 3: Nanahoshi Kangengakudan feat. GUMI - FREEDMAN (Cut Ver.)",
+    "🔴 Stage 4: seatrus - Kokan Sensou",
+    "🟠 Stage 5: seatrus - TEMP3ST",
+    "🔵 Stage 6: SAVE THE QUEEN - EX-Termination",
+    "🔵 Stage 7: Machine Girl - Psychic Attack (Cut Ver.)"
+];
+
 const commands = [
     new SlashCommandBuilder().setName("start").setDescription("Start a new draft game"),
     new SlashCommandBuilder().setName("join").setDescription("Join the draft game"),
@@ -146,7 +156,86 @@ function endDraft(channel) {
 
     channel.send({ embeds: [embed] });
 
-    activeGame = null;
+    startMatchPhase(channel);
+}
+// --- Stage 2 Match Phase ---
+function startMatchPhase(channel) {
+    activeGame.matchPhase = true;
+
+    const map = MAP_POOL[Math.floor(Math.random() * MAP_POOL.length)];
+    activeGame.selectedMap = map;
+
+    activeGame.playerPicks = [];
+    activeGame.opponentPicks = [];
+    activeGame.ready = {
+        player1: false,
+        player2: false
+    };
+
+    const embed = new EmbedBuilder()
+        .setColor(0x00ae86)
+        .setTitle("🎵 Match Phase Started")
+        .setDescription(
+            `Random map selected:\n**${map}**\n\n` +
+            `Both players must select **3 players** from their roster.\n` +
+            `You have **20 seconds**.\n` +
+            `Use the selection menu below.`
+        )
+        .setFooter({ text: "osu!draft bot" })
+        .setTimestamp();
+
+    channel.send({ embeds: [embed] });
+
+    sendPickMenu(channel);
+
+    // 20 second timer
+    setTimeout(() => {
+        if (!activeGame.ready.player1 || !activeGame.ready.player2) {
+            channel.send("⏱️ Time's up! Match starting with current selections.");
+            startMatch(channel);
+        }
+    }, 20000);
+}
+
+function sendPickMenu(channel) {
+    const roster1 = activeGame.playerTeam.map(c => ({ label: c, value: c }));
+    const roster2 = activeGame.opponentTeam.map(c => ({ label: c, value: c }));
+
+    const menu1 = new StringSelectMenuBuilder()
+        .setCustomId("pick_p1")
+        .setPlaceholder("Player 1: Select 3 players")
+        .setMinValues(3)
+        .setMaxValues(3)
+        .addOptions(roster1);
+
+    const menu2 = new StringSelectMenuMenuBuilder()
+        .setCustomId("pick_p2")
+        .setPlaceholder("Player 2: Select 3 players")
+        .setMinValues(3)
+        .setMaxValues(3)
+        .addOptions(roster2);
+
+    const row1 = new ActionRowBuilder().addComponents(menu1);
+    const row2 = new ActionRowBuilder().addComponents(menu2);
+
+    channel.send({ components: [row1, row2] });
+}
+
+function startMatch(channel) {
+    const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle("🔥 Match Starting!")
+        .setDescription(
+            `Map: **${activeGame.selectedMap}**\n\n` +
+            `**Player 1 picks:**\n${activeGame.playerPicks.join("\n")}\n\n` +
+            `**Player 2 picks:**\n${activeGame.opponentPicks.join("\n")}`
+        )
+        .setFooter({ text: "osu!draft bot" })
+        .setTimestamp();
+
+    channel.send({ embeds: [embed] });
+
+    // Stage 3 can be added here later (scoring, winner, etc.)
 }
 
 // Helper: finish bidding for current character
@@ -170,8 +259,55 @@ function finishBidding(channel, reason) {
         channel.send({ embeds: [embed] });
 
 // Check if either team reached 6 players
+// Check if either team reached 6 players OR someone hit $0
 const team1Full = activeGame.playerTeam.length >= 6;
 const team2Full = activeGame.opponentTeam.length >= 6;
+const someoneBroke = activeGame.playerBudget <= 0 || activeGame.opponentBudget <= 0;
+
+// If both teams full → end draft
+if (team1Full && team2Full) {
+    endDraft(channel);
+    return;
+}
+
+// If someone hit $0 OR one team is full → enter distribution phase
+if (someoneBroke || team1Full || team2Full) {
+    activeGame.distributionPhase = true;
+
+    // Determine distributor (the one who still has money)
+    if (activeGame.playerBudget > 0 && activeGame.opponentBudget <= 0) {
+        activeGame.distributor = activeGame.players[0];
+    } else if (activeGame.opponentBudget > 0 && activeGame.playerBudget <= 0) {
+        activeGame.distributor = activeGame.players[1];
+    } else {
+        // If one team is full, the other distributes
+        activeGame.distributor = team1Full ? activeGame.players[1] : activeGame.players[0];
+    }
+
+    activeGame.remainingPool = [...activeGame.draftPool];
+    activeGame.draftPool = [];
+
+    const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle("⚠️ Distribution Phase Started")
+        .setDescription(
+            `One side can no longer bid.\n` +
+            `The remaining characters must be distributed manually.\n\n` +
+            `**Distributor:** <@${activeGame.distributor}>\n\n` +
+            `**Remaining characters:**\n${activeGame.remainingPool.map(c => `• ${c}`).join("\n")}\n\n` +
+            `Type **take** to claim the next character.\n` +
+            `Type **give** to give it to the other player.\n\n` +
+            `Continue until both teams reach 6 players.`
+        );
+
+    channel.send({ embeds: [embed] });
+    return;
+}
+
+// Continue normally
+activeGame.round += 1;
+startDraftRound(channel);
+
 
 if (team1Full || team2Full) {
     // Give remaining characters to the other team
@@ -523,11 +659,98 @@ client.on("interactionCreate", async (interaction) => {
         activeGame = null;
         return;
     }
+// --- Stage 2 pick handlers ---
+if (interaction.customId === "pick_p1") {
+    activeGame.playerPicks = interaction.values;
+    activeGame.ready.player1 = true;
+
+    await interaction.reply("Player 1 ready!");
+
+    if (activeGame.ready.player2) {
+        startMatch(interaction.channel);
+    }
+}
+
+if (interaction.customId === "pick_p2") {
+    activeGame.opponentPicks = interaction.values;
+    activeGame.ready.player2 = true;
+
+    await interaction.reply("Player 2 ready!");
+
+    if (activeGame.ready.player1) {
+        startMatch(interaction.channel);
+    }
+}
+
+    
 });
 
 // Message listener for bidding
 client.on("messageCreate", async (message) => {
     if (!activeGame) return;
+    // Distribution Phase
+if (activeGame.distributionPhase) {
+    if (message.author.bot) return;
+
+    const pool = activeGame.remainingPool;
+    if (pool.length === 0) {
+        endDraft(message.channel);
+        return;
+    }
+
+    const nextChar = pool[0];
+
+    const content = message.content.trim().toLowerCase();
+
+    // Only distributor can assign characters
+    if (message.author.id !== activeGame.distributor) {
+        message.reply("Only the distributor can assign remaining characters.");
+        return;
+    }
+
+    if (content !== "take" && content !== "give") {
+        message.reply("Type **take** or **give**.");
+        return;
+    }
+
+    // Distributor takes the character
+    if (content === "take") {
+        if (activeGame.distributor === activeGame.players[0]) {
+            activeGame.playerTeam.push(nextChar);
+        } else {
+            activeGame.opponentTeam.push(nextChar);
+        }
+        pool.shift();
+    }
+
+    // Distributor gives the character
+    if (content === "give") {
+        if (activeGame.distributor === activeGame.players[0]) {
+            activeGame.opponentTeam.push(nextChar);
+        } else {
+            activeGame.playerTeam.push(nextChar);
+        }
+        pool.shift();
+    }
+
+    // Check if both teams full
+    if (activeGame.playerTeam.length >= 6 && activeGame.opponentTeam.length >= 6) {
+        endDraft(message.channel);
+        return;
+    }
+
+    // Show next character
+    if (pool.length > 0) {
+        message.channel.send(
+            `Next character: **${pool[0]}**\nType **take** or **give**`
+        );
+    } else {
+        endDraft(message.channel);
+    }
+
+    return;
+}
+
     if (message.author.bot) return;
     if (message.channel.id !== activeGame.channelId) return;
     if (!activeGame.biddingOpen) return;
