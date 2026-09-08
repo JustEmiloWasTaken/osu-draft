@@ -169,8 +169,30 @@ function finishBidding(channel, reason) {
             .setTimestamp();
         channel.send({ embeds: [embed] });
 
-        activeGame.round += 1;
-        startDraftRound(channel);
+// Check if either team reached 6 players
+const team1Full = activeGame.playerTeam.length >= 6;
+const team2Full = activeGame.opponentTeam.length >= 6;
+
+if (team1Full || team2Full) {
+    // Give remaining characters to the other team
+    while (activeGame.draftPool.length > 0) {
+        const leftover = activeGame.draftPool.pop();
+        if (!team1Full) {
+            activeGame.playerTeam.push(leftover);
+        } else {
+            activeGame.opponentTeam.push(leftover);
+        }
+    }
+
+    // End draft immediately
+    endDraft(channel);
+    return;
+}
+
+// Continue normally
+activeGame.round += 1;
+startDraftRound(channel);
+
         return;
     }
 
@@ -205,12 +227,14 @@ function finishBidding(channel, reason) {
         .setColor(0x9b59b6)
         .setTitle("✅ Bidding Finished")
         .setDescription(
-            `**${character}** was won by ${winnerLabel} for **$${amount}**.\n\n` +
-            `Reason: **${reason === "timeout" ? "No bids for 10 seconds" : "Player ended bidding"}**\n\n` +
-            `Budgets now:\n` +
-            `• Team 1: $${activeGame.playerBudget}\n` +
-            `• Team 2: $${activeGame.opponentBudget}`
-        )
+    `**${character}** was won by ${winnerLabel} for **$${amount}**.\n\n` +
+    `Reason: **${reason === "timeout" ? "No bids for 10 seconds" : "Player ended bidding"}**\n\n` +
+    `**Team 1 roster:**\n${activeGame.playerTeam.length ? activeGame.playerTeam.map(c => `• ${c}`).join("\n") : "No picks yet"}\n\n` +
+    `**Team 2 roster:**\n${activeGame.opponentTeam.length ? activeGame.opponentTeam.map(c => `• ${c}`).join("\n") : "No picks yet"}\n\n` +
+    `**Budgets:**\n` +
+    `• Team 1: $${activeGame.playerBudget}\n` +
+    `• Team 2: $${activeGame.opponentBudget}`
+)
         .setFooter({ text: "osu!draft bot" })
         .setTimestamp();
 
