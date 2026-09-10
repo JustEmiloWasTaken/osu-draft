@@ -33,10 +33,10 @@ const client = new Client({
 let activeGame = null;
 
 const DRAFT_CHARACTERS = [
-"konkawe","WOEM2436","Minwoo3098","Naaaad","Anterex","imyeeyee","Sawdust Inhaler","Seitora",
-"myucchii","Rinsresg","grillroasted","Kureha_","[LS]sdkl4","riftoyu","ime","[GB]ParasolTree",
-"--Pavin--","spanner dude","oct4","[BBC]Senzawa","yeIo","Big noob lol","zinkotripas","flowerful",
-"theman234 tonk","mae0149","Aepq","klobuck","_yea","[MY] VASD","Zoobin4","Chara Undertale",
+":flag_th: konkawe",":flag_cn :WOEM2436",":flag_us: Minwoo3098",":flag_kr: Naaaad",":flag_cl: Anterex",":flag_kr: imyeeyee",":flag_ca:Sawdust Inhaler",":flag_us:Seitora",
+":flag_cl: myucchii",":flag_ru: Rinsresg",":flag_cz: grillroasted",":flag_hk: Kureha_",":flag_au: [LS]sdkl4",":flag_ru: riftoyu",":flag_es: ime",":flag_cn: [GB]ParasolTree",
+":flag_th: --Pavin--",":flag_gb: spanner dude",":flag_au: oct4",":flag_mx: [BBC]Senzawa",":flag_ve: yeIo",":flag_sg: Big noob lol",":flag_pe: zinkotripas",":flag_fr: flowerful",
+":flag_ca: theman234 tonk",":flag_ca: mae0149",":flag_my: Aepq",":flag_pl: klobuck",":flag_id: _yea",":flag_my: [MY] VASD",":flag_gb: Zoobin4",":flag_qa: Chara Undertale",
 "zmxnksjd","Koishi Komeijie","Vixile","JayLye","Miwiki","XxNewson1234xX","snow leopard","stoneworm",
 "_dev_","oyama mahiro","Unitori-","henryalexbr","Darkhechiser","-hakitsu","bambi fnf","TriDoanGaming",
 "ggeexx1","zidae","Fier","Kalv","yut4a","eiEn_","Lighttt","bili_TYL","-Aishiteru-","borrys",
